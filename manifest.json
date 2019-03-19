@@ -1,0 +1,26 @@
+{
+    "applications": {
+        "gecko": {
+            "id": "buysellenhancer@theonlylars.com"
+        }
+    },
+
+    "manifest_version": 2,
+    "name": "Pinkbike Buysell Enhancer",
+    "version": "1.0",
+
+    "permissions": [
+      "storage"
+    ],
+  
+    "content_scripts": [
+      {
+        "matches": ["https://www.pinkbike.com/buysell/list/*"],
+        "js": ["js/watchlist.js"]
+      },
+      {
+          "matches": ["https://www.pinkbike.com/u/*/buysell/watchlist/"],
+          "js": ["js/watchlist.js"]
+      }
+    ]  
+  }
