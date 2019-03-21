@@ -11,37 +11,27 @@ class BuySellItem {
     note?: String;
     price_history?: {[key: number]: string};
     first_seen?: string;
+    username?: string;
 }
 
 function doSomething() {
-    console.log("LOADED WATCHLIST JS");
-
     var items = document.getElementsByClassName("bsitem");
     
-    var itemTitleAnchors = document.querySelectorAll<HTMLElement>(".bsitem > table:first-child  tr:nth-child(1) td:nth-child(2) a:first-child");
+    // var itemTitleAnchors = document.querySelectorAll<HTMLElement>(".bsitem > table:first-child  tr:nth-child(1) td:nth-child(2) a:first-child");
     
     var allItems: NodeListOf<HTMLElement> = document.querySelectorAll<HTMLElement>(".bsitem > table:first-child  tr:nth-child(1) td:nth-child(2)");
     
     // console.log("Found " + allItems.length + " items!");
 
-    allItems.forEach( (item) => {
-        var titleAnchor: HTMLLinkElement | null = item.querySelector<HTMLElement>("a:first-child") as HTMLLinkElement;
-
-        if (titleAnchor) {
-            // var itemName: Node = titleAnchor.innerText;
-            // var itemID = titleAnchor.href.replace(/\D/g,'');
-        }
-
-        manipulateItem(item);
-    })
+    allItems.forEach(manipulateItem)
 }
 
-function manipulatePrice(oldPrice, priceValue, priceElement) {
+function manipulatePrice(oldPrice: number, priceValue: number, priceElement: HTMLTableDataCellElement | HTMLTableHeaderCellElement) {
     if (oldPrice == priceValue || oldPrice <= 0) {
         return;
     }
     console.log("Manipulating price row: " + priceValue);
-    priceElement.innerHTML = '<big style="color: red">' + priceElement.innerHTML + '</big>&nbsp;<s>' + priceElement.innerText.replace(priceValue, oldPrice) + '</s>';
+    priceElement.innerHTML = '<big style="color: red">' + priceElement.innerHTML + '</big>&nbsp;<s>' + priceElement.innerText.replace(priceValue.toString(), oldPrice.toString()) + '</s>';
 }
 
 function highlightNewItem(highlightElement: HTMLElement) {
@@ -80,8 +70,13 @@ function manipulateItem(item: HTMLElement) {
     // console.log("Item ID: " + itemID);
     var itemTable = item.querySelector("table");
     if (itemTable) {
-        var priceElement = itemTable.rows[2].cells[0];
-        var priceHTML = priceElement.innerHTML;
+        let priceElement = itemTable.rows[2].cells[0];
+        let usernameRowAnchors = itemTable.rows[1].querySelectorAll("a");
+        var userNameString: string = "";
+        if (usernameRowAnchors.length > 0) {
+            userNameString = usernameRowAnchors[0].innerText;
+        }
+        // var priceHTML = priceElement.innerHTML;
         var rawPriceString = priceElement.innerText;
         var priceValue = parseInt(rawPriceString.replace(/\D/g,''), 10); // Compare price to stored price
 
@@ -94,6 +89,12 @@ function manipulateItem(item: HTMLElement) {
             if (storedItem === undefined) {
                 storedItem = new BuySellItem();
             }
+
+            var username: string | undefined = storedItem.username;
+            if (username === undefined) {
+                username = userNameString;
+            }
+
             var prices: number[] | undefined = storedItem.prices;
             if (prices === undefined) {
                 prices = [];
@@ -164,6 +165,7 @@ function manipulateItem(item: HTMLElement) {
             newItemObject.price_history = priceHistory;
             newItemObject.first_seen = firstSeenDate.toJSON();
             newItemObject.note = note;
+            newItemObject.username = username;
 
             let setPromise = browser.storage.local.set({['item-'+itemID]: newItemObject});
             browser.storage.sync.set({['item-'+itemID]: newItemObject});
@@ -183,7 +185,6 @@ function manipulateItem(item: HTMLElement) {
 }
 
 if (document.readyState === "loading") {  // Loading hasn't finished yet
-    console.log("DOM STILL LOADING! DEFERRING");
     document.addEventListener("DOMContentLoaded", doSomething);
 } else {  // `DOMContentLoaded` has already fired
     doSomething();
