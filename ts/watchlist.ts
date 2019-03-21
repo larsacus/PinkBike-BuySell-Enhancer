@@ -14,16 +14,39 @@ class BuySellItem {
     username?: string;
 }
 
+class Preferences {
+    first_date: string = (new Date()).toJSON();
+    ignored_sellers: string[] = [];
+
+    firstDate(): Date {
+        return new Date(this.first_date);
+    }
+}
+
 function doSomething() {
     var items = document.getElementsByClassName("bsitem");
     
     // var itemTitleAnchors = document.querySelectorAll<HTMLElement>(".bsitem > table:first-child  tr:nth-child(1) td:nth-child(2) a:first-child");
     
-    var allItems: NodeListOf<HTMLElement> = document.querySelectorAll<HTMLElement>(".bsitem > table:first-child  tr:nth-child(1) td:nth-child(2)");
+    browser.storage.sync.get(["preferences"]).then((obj = {}) => {
+        var allItems: NodeListOf<HTMLElement> = document.querySelectorAll<HTMLElement>(".bsitem > table:first-child  tr:nth-child(1) td:nth-child(2)");
     
-    // console.log("Found " + allItems.length + " items!");
+        // console.log("Found " + allItems.length + " items!");
 
-    allItems.forEach(manipulateItem)
+        let pref: Preferences | undefined = obj["preferences"];
+        let prefObj: Preferences;
+        if (pref === undefined) {
+            prefObj = new Preferences();
+        } else {
+            prefObj = pref;
+        }
+
+        browser.storage.sync.set({["preferences"]: prefObj});
+    
+        allItems.forEach((item) => {
+            manipulateItem(item, prefObj);
+        })
+    });
 }
 
 function manipulatePrice(oldPrice: number, priceValue: number, priceElement: HTMLTableDataCellElement | HTMLTableHeaderCellElement) {
@@ -59,7 +82,7 @@ function saveNotes(textFieldID: String, itemID: String) {
     // });
 }
 
-function manipulateItem(item: HTMLElement) {
+function manipulateItem(item: HTMLElement, preferences: Preferences) {
     var titleAnchor: HTMLLinkElement | null = item.querySelector("a:first-child") as HTMLLinkElement;
     if (titleAnchor) {
         var itemName = titleAnchor.innerText;
@@ -146,7 +169,8 @@ function manipulateItem(item: HTMLElement) {
             if (item.parentNode) {
                 let highlightElement = item.parentNode.querySelector("img");
                 if (highlightElement) {
-                    if ((firstSeenDate.valueOf() - nowDate.valueOf())/(60*60) > -86400) { // 24h ago
+                    if (((firstSeenDate.valueOf() - nowDate.valueOf())/(60*60) > -86400) &&
+                        ((firstSeenDate.valueOf() - preferences.firstDate().valueOf()) > -86400)) { // 24h ago
                         highlightNewItem(highlightElement);
                     }
                 }
@@ -167,8 +191,7 @@ function manipulateItem(item: HTMLElement) {
             newItemObject.note = note;
             newItemObject.username = username;
 
-            let setPromise = browser.storage.local.set({['item-'+itemID]: newItemObject});
-            browser.storage.sync.set({['item-'+itemID]: newItemObject});
+            let setPromise = browser.storage.sync.set({['item-'+itemID]: newItemObject});
             setPromise.then(()=> {
                 
             }, (error) => {
@@ -178,7 +201,7 @@ function manipulateItem(item: HTMLElement) {
 
         console.log("Fetching stored item for key: " + itemKey);
 
-        let pricePromise = browser.storage.local.get([itemKey]).then(onGet, (error) => {
+        let pricePromise = browser.storage.sync.get([itemKey]).then(onGet, (error) => {
             console.log("Error fetching key " + itemKey + ": " + error);
         });
     }
