@@ -17,10 +17,6 @@ class BuySellItem {
 class Preferences {
     first_date: string = (new Date()).toJSON();
     ignored_sellers: string[] = [];
-
-    firstDate(): Date {
-        return new Date(this.first_date);
-    }
 }
 
 function doSomething() {
@@ -33,7 +29,7 @@ function doSomething() {
     
         // console.log("Found " + allItems.length + " items!");
 
-        let pref: Preferences | undefined = obj["preferences"];
+        let pref: Preferences | undefined = obj.preferences;
         let prefObj: Preferences;
         if (pref === undefined) {
             prefObj = new Preferences();
@@ -169,8 +165,8 @@ function manipulateItem(item: HTMLElement, preferences: Preferences) {
             if (item.parentNode) {
                 let highlightElement = item.parentNode.querySelector("img");
                 if (highlightElement) {
-                    if (((firstSeenDate.valueOf() - nowDate.valueOf())/(60*60) > -86400) &&
-                        ((firstSeenDate.valueOf() - preferences.firstDate().valueOf()) > -86400)) { // 24h ago
+                    if (((firstSeenDate.valueOf() - nowDate.valueOf())/(60*60) > -43200) &&
+                        ((firstSeenDate.valueOf() - (new Date(preferences.first_date)).valueOf()) > -86400)) { // 24h ago
                         highlightNewItem(highlightElement);
                     }
                 }
