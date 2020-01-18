@@ -8,7 +8,7 @@
 
 class BuySellItem {
     prices?: number[];
-    note?: String;
+    note?: string;
     price_history?: {[key: number]: string};
     first_seen?: string;
     username?: string;
@@ -17,6 +17,11 @@ class BuySellItem {
 class Preferences {
     first_date: string = (new Date()).toJSON();
     ignored_sellers: string[] = [];
+}
+
+class NoteSaveMessage {
+    note_id: string
+    field_tag: string
 }
 
 function doSomething() {
@@ -57,25 +62,31 @@ function highlightNewItem(highlightElement: HTMLElement) {
     highlightElement.style.background = "DarkSeaGreen";
 }
 
-function addNotesRow(itemTable: HTMLTableElement, itemID: String) {
+function addNotesRow(itemTable: HTMLTableElement, itemID: string, note: string) {
     console.log("Adding notes row");
     var notesRow = itemTable.insertRow();
     var notesCell = notesRow.insertCell();
-    notesCell.innerHTML = `<form style="width: 100%" onsubmit="event.preventDefault();saveNotes('notes-${itemID}','${itemID}');"><b>Notes:</b><br><input type="text" name="notes" style="height: 3em; width: 90%;" id="notes-${itemID}"><br><input type="submit" value="Save Note"></form>`;
+    const fieldID = `notes-${itemID}`
+    notesCell.innerHTML = `<form style="width: 100%" onsubmit="event.preventDefault();window.postMessage({'note_id': '${itemID}', 'field_tag': '${fieldID}'}, window.location.origin);return false;"><b>Notes:</b><br><input type="text" name="notes" style="height: 3em; width: 90%;" id="notes-${itemID}" value="${note}"><br><input type="submit" value="Save Note"></form>`;
 }
 
-function saveNotes(textFieldID: String, itemID: String) {
-    let textField = document.querySelector(`#${textFieldID}`) as HTMLTextAreaElement;
-    let text = textField.innerText;
+function saveNotes(noteSaveMessage: NoteSaveMessage) {
+    let textFieldID: String = noteSaveMessage.field_tag
+    let itemID: String = noteSaveMessage.note_id
+    let textFieldSelector = `#${textFieldID}`
+    let textField = document.querySelector(textFieldSelector) as HTMLTextAreaElement;
+    let text = textField.value;
 
-    /// THIS DOESN'T WORK
-    // let pricePromise = browser.storage.local.get(itemKey);
-    // pricePromise.then((item) => {
-    //     item.notes = text;
-    //     browser.storage.local.set({itemID: item});
-    // }, (error) => {
-    //     console.log("Error fetching key " + itemKey + ": " + error);
-    // });
+    console.log(`Attempting to save note "${text}" for text field ID ${textFieldID}`)
+
+    let pricePromise = browser.storage.sync.get([itemID]);
+    pricePromise.then((item) => {
+        item.note = text;
+        browser.storage.sync.set({['item-'+itemID]: item});
+        console.log(`Successfully saved note "${text}" for text field ID ${textFieldID}`)
+    }, (error) => {
+        console.log("Error fetching key " + itemID + ": " + error);
+    });
 }
 
 function manipulateItem(item: HTMLElement, preferences: Preferences) {
@@ -126,6 +137,10 @@ function manipulateItem(item: HTMLElement, preferences: Preferences) {
                 note = "";
             }
 
+            if (itemTable) {
+                addNotesRow(itemTable, itemID, note);
+            }
+
             console.log("Fetched note: " + note);
 
             var lastPrice: number = 0;
@@ -141,6 +156,9 @@ function manipulateItem(item: HTMLElement, preferences: Preferences) {
                 // Price is same as last price and we have more prices - try and get the real last price
                 lastPrice = prices[1];
             }
+            // prices = prices.filter((value) => {
+            //     return (value < 10000);
+            // })
             console.log("All previous prices: " + prices);
 
             var priceHistory = storedItem.price_history;
@@ -175,10 +193,6 @@ function manipulateItem(item: HTMLElement, preferences: Preferences) {
 
             manipulatePrice(lastPrice, priceValue, priceElement);
 
-            if (itemTable) {
-                addNotesRow(itemTable, itemID);
-            }
-
             // Serialize object back into storage
             var newItemObject: BuySellItem = {};
             newItemObject.prices = prices;
@@ -203,8 +217,19 @@ function manipulateItem(item: HTMLElement, preferences: Preferences) {
     }
 }
 
+function receiveMessage(event: MessageEvent) {
+    if(isNoteCreationEvent(event.data)) {
+        console.log(`Received message: ${event.data}`)
+        saveNotes(event.data);
+    }
+}
+
 if (document.readyState === "loading") {  // Loading hasn't finished yet
     document.addEventListener("DOMContentLoaded", doSomething);
 } else {  // `DOMContentLoaded` has already fired
     doSomething();
 }
+
+const isNoteCreationEvent = (noteCreationEvent: NoteSaveMessage): noteCreationEvent is NoteSaveMessage => (<NoteSaveMessage>noteCreationEvent).note_id !== undefined
+
+window.addEventListener("message", receiveMessage, false);
