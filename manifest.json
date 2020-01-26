@@ -15,12 +15,9 @@
   
     "content_scripts": [
       {
-        "matches": ["https://www.pinkbike.com/buysell/list/*"],
-        "js": ["js/watchlist.js"]
-      },
-      {
-          "matches": ["https://www.pinkbike.com/u/*/buysell/watchlist/"],
-          "js": ["js/watchlist.js"]
+        "matches": ["https://www.pinkbike.com/buysell/list/*","https://www.pinkbike.com/u/*/buysell/watchlist/"],
+        "js": ["js/watchlist.js"],
+        "css" : ["/css/buysell.css"]
       }
-    ]  
+    ]
   }

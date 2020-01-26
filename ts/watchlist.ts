@@ -24,6 +24,16 @@ class NoteSaveMessage {
     field_tag: string
 }
 
+class HistoricalPrice {
+    price: number
+    date: Date
+
+    constructor(price: number, date: Date) {
+        this.price = price
+        this.date = date
+    }
+}
+
 function doSomething() {
     var items = document.getElementsByClassName("bsitem");
     
@@ -50,12 +60,34 @@ function doSomething() {
     });
 }
 
-function manipulatePrice(oldPrice: number, priceValue: number, priceElement: HTMLTableDataCellElement | HTMLTableHeaderCellElement) {
+function manipulatePrice(historicalPrices: HistoricalPrice[], priceValue: number, priceElement: HTMLTableDataCellElement | HTMLTableHeaderCellElement) {
+    let pricesByPrice = [...historicalPrices].sort((a,b) => a.price - b.price)
+    let highestPrice = pricesByPrice.pop()
+
+    if (!highestPrice) {
+        return
+    }
+
+    let oldPrice = highestPrice.price
     if (oldPrice == priceValue || oldPrice <= 0) {
         return;
     }
+
+    let tooltipHTML: string = ""
+    if (historicalPrices.length > 1) {
+        tooltipHTML = "<ul>"
+        historicalPrices.forEach(previousPrice => {
+            tooltipHTML += `<li><em>$${previousPrice.price}</em>&nbsp;&mdash;&nbsp;${previousPrice.date.toLocaleDateString()}</li>`
+        })
+        tooltipHTML+="</ul>"
+    }
+
+    if (priceElement.innerHTML.includes("<s>")) {
+        // Price has already been manipulated — skip
+        return;
+    }
     console.log("Manipulating price row: " + priceValue);
-    priceElement.innerHTML = '<big style="color: red">' + priceElement.innerHTML + '</big>&nbsp;<s>' + priceElement.innerText.replace(priceValue.toString(), oldPrice.toString()) + '</s>';
+    priceElement.innerHTML = '<big style="color: red" class="bs-tooltip">' + priceElement.innerHTML + `<span class="bs-tooltiptext">${tooltipHTML}</span></big>&nbsp;<s>` + priceElement.innerText.replace(priceValue.toString(), oldPrice.toString()) + '</s>';
 }
 
 function highlightNewItem(highlightElement: HTMLElement) {
@@ -85,7 +117,7 @@ function saveNotes(noteSaveMessage: NoteSaveMessage) {
         browser.storage.sync.set({['item-'+itemID]: item});
         console.log(`Successfully saved note "${text}" for text field ID ${textFieldID}`)
     }, (error) => {
-        console.log("Error fetching key " + itemID + ": " + error);
+        console.error("Error fetching key " + itemID + ": " + error);
     });
 }
 
@@ -100,121 +132,123 @@ function manipulateItem(item: HTMLElement, preferences: Preferences) {
     // console.log("Item ID: " + itemID);
     var itemTable = item.querySelector("table");
     if (itemTable) {
-        let priceElement = itemTable.rows[2].cells[0];
-        let usernameRowAnchors = itemTable.rows[1].querySelectorAll("a");
-        var userNameString: string = "";
-        if (usernameRowAnchors.length > 0) {
-            userNameString = usernameRowAnchors[0].innerText;
+        modifyTableItem(itemTable, itemID, item, preferences);
+    }
+}
+
+function modifyTableItem(itemTable: HTMLTableElement, itemID: string, item: HTMLElement, preferences: Preferences) {
+    let priceElement = itemTable.rows[2].cells[0];
+    let usernameRowAnchors = itemTable.rows[1].querySelectorAll("a");
+    var userNameString: string = "";
+    if (usernameRowAnchors.length > 0) {
+        userNameString = usernameRowAnchors[0].innerText;
+    }
+    // var priceHTML = priceElement.innerHTML;
+    var rawPriceString = priceElement.innerText;
+    var priceValue = parseInt(rawPriceString.replace(/\D/g, ''), 10); // Compare price to stored price
+    var itemKey = "item-" + itemID;
+    function onGet(storageFetchObject = {}) {
+        console.log("Fetched stored item for ID " + itemID + ": " + storageFetchObject.toString());
+        var storedItem: BuySellItem = storageFetchObject[itemKey];
+        if (storedItem === undefined) {
+            storedItem = new BuySellItem();
         }
-        // var priceHTML = priceElement.innerHTML;
-        var rawPriceString = priceElement.innerText;
-        var priceValue = parseInt(rawPriceString.replace(/\D/g,''), 10); // Compare price to stored price
+        var username: string | undefined = storedItem.username;
+        if (username === undefined) {
+            username = userNameString;
+        }
+        var prices: number[] | undefined = storedItem.prices;
+        if (prices === undefined) {
+            prices = [];
+        }
+        console.log("Fetched prices: " + prices);
+        var note = storedItem.note;
+        if (note === undefined) {
+            note = "";
+        }
+        if (itemTable) {
+            addNotesRow(itemTable, itemID, note);
+        }
+        console.log("Fetched note: " + note);
+        var lastPrice: number = 0;
+        if (prices.length > 0) {
+            lastPrice = prices[0];
+        }
+        console.log("Last Price:" + lastPrice);
+        if (lastPrice != priceValue) {
+            // First time we've seen this new different price
+            prices.unshift(priceValue);
+        }
+        else if (prices.length > 1) {
+            // Price is same as last price and we have more prices - try and get the real last price
+            lastPrice = prices[1];
+        }
+        prices = prices.filter((value) => {
+            return (value < 10000);
+        })
+        console.log("All previous prices: " + prices);
 
-        var itemKey = "item-" + itemID;
+        var priceHistory: {[key: number]: string} = storedItem.price_history || {};
+        if (priceHistory[priceValue] === undefined) {
+            priceHistory[priceValue] = (new Date()).toJSON();
+        }
 
-        function onGet(storageFetchObject = {}) {
-            console.log("Fetched stored item for ID " + itemID + ": " + storageFetchObject.toString());
-            
-            var storedItem: BuySellItem = storageFetchObject[itemKey];
-            if (storedItem === undefined) {
-                storedItem = new BuySellItem();
+        let sortedPriceArray: HistoricalPrice[] = []
+        Object.keys(priceHistory).forEach( key => {
+            let dateString: string | undefined = priceHistory[key]
+            if (dateString) {
+                sortedPriceArray.push(new HistoricalPrice(Number(key),new Date(dateString)))
             }
+        });
+        
+        sortedPriceArray = sortedPriceArray.filter(a => {
+            return a.price < 10000
+        }).sort((a, b) => {
+            return a.date.getTime() - b.date.getTime()
+        })
 
-            var username: string | undefined = storedItem.username;
-            if (username === undefined) {
-                username = userNameString;
-            }
-
-            var prices: number[] | undefined = storedItem.prices;
-            if (prices === undefined) {
-                prices = [];
-            }
-
-            console.log("Fetched prices: " + prices);
-
-            var note = storedItem.note;
-            if (note === undefined) {
-                note = "";
-            }
-
-            if (itemTable) {
-                addNotesRow(itemTable, itemID, note);
-            }
-
-            console.log("Fetched note: " + note);
-
-            var lastPrice: number = 0;
-            if (prices.length > 0) {
-                lastPrice = prices[0];
-            }
-            console.log("Last Price:" + lastPrice);
-
-            if (lastPrice != priceValue) {
-                // First time we've seen this new different price
-                prices.unshift(priceValue);
-            } else if (prices.length > 1) {
-                // Price is same as last price and we have more prices - try and get the real last price
-                lastPrice = prices[1];
-            }
-            // prices = prices.filter((value) => {
-            //     return (value < 10000);
-            // })
-            console.log("All previous prices: " + prices);
-
-            var priceHistory = storedItem.price_history;
-            if (priceHistory === undefined) {
-                priceHistory = {};
-            }
-            if (priceHistory[priceValue] === undefined) {
-                priceHistory[priceValue] = (new Date()).toJSON();
-            }
-
-            console.log("Price History: " + priceHistory);
-
-            var firstSeen = storedItem.first_seen;
-            let nowDate: Date = new Date();
-            let firstSeenDate: Date;
-            if (firstSeen === undefined) {
-                firstSeenDate = nowDate;
-            } else {
-                firstSeenDate = new Date(firstSeen);
-            }
-
-            if (item.parentNode) {
-                let highlightElement = item.parentNode.querySelector("img");
-                if (highlightElement) {
-                    if (((firstSeenDate.valueOf() - nowDate.valueOf())/(60*60) > -43200) &&
-                        ((firstSeenDate.valueOf() - (new Date(preferences.first_date)).valueOf()) > -86400)) { // 24h ago
-                        highlightNewItem(highlightElement);
-                    }
+        console.log("Price History: " + priceHistory);
+        var firstSeen = storedItem.first_seen;
+        let nowDate: Date = new Date();
+        let firstSeenDate: Date;
+        if (firstSeen === undefined) {
+            firstSeenDate = nowDate;
+        }
+        else {
+            firstSeenDate = new Date(firstSeen);
+        }
+        if (item.parentNode) {
+            let highlightElement = item.parentNode.querySelector("img");
+            if (highlightElement) {
+                if (((firstSeenDate.valueOf() - nowDate.valueOf()) / (60 * 60) > -43200) &&
+                    ((firstSeenDate.valueOf() - (new Date(preferences.first_date)).valueOf()) > -86400)) { // 24h ago
+                    highlightNewItem(highlightElement);
                 }
             }
-            console.log("First seen: " + firstSeenDate);
-
-            manipulatePrice(lastPrice, priceValue, priceElement);
-
-            // Serialize object back into storage
-            var newItemObject: BuySellItem = {};
-            newItemObject.prices = prices;
-            newItemObject.price_history = priceHistory;
-            newItemObject.first_seen = firstSeenDate.toJSON();
-            newItemObject.note = note;
-            newItemObject.username = username;
-
-            let setPromise = browser.storage.sync.set({['item-'+itemID]: newItemObject});
-            setPromise.then(()=> {
-                
-            }, (error) => {
-                console.log("Error saving " + itemID + ": " + error.toString());
-            });
         }
-
-        console.log("Fetching stored item for key: " + itemKey);
-
-        let pricePromise = browser.storage.sync.get([itemKey]).then(onGet, (error) => {
-            console.log("Error fetching key " + itemKey + ": " + error);
-        });
+        console.log("First seen: " + firstSeenDate);
+        manipulatePrice(sortedPriceArray, priceValue, priceElement);
+        // Serialize object back into storage
+        saveItem(prices, priceHistory, firstSeenDate, note, username, itemKey, itemID);
     }
+    console.log("Fetching stored item for key: " + itemKey);
+    let pricePromise = browser.storage.sync.get([itemKey]).then(onGet, (error) => {
+        console.error("Error fetching key " + itemKey + ": " + error);
+    });
+}
+
+function saveItem(prices: number[], priceHistory: { [key: number]: string; }, firstSeenDate: Date, note: string, username: string, itemKey: string, itemID: string) {
+    var newItemObject: BuySellItem = {};
+    newItemObject.prices = prices;
+    newItemObject.price_history = priceHistory;
+    newItemObject.first_seen = firstSeenDate.toJSON();
+    newItemObject.note = note;
+    newItemObject.username = username;
+    let setPromise = browser.storage.sync.set({ [itemKey]: newItemObject });
+    setPromise.then(() => {
+    }, (error) => {
+        console.error("Error saving " + itemID + ": " + error.toString());
+    });
 }
 
 function receiveMessage(event: MessageEvent) {

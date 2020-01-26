@@ -1,0 +1,24 @@
+/* Tooltip container */
+.bs-tooltip {
+    position: relative;
+    display: inline-block;
+}
+    
+    /* Tooltip text */
+.bs-tooltip .bs-tooltiptext {
+    visibility: hidden;
+    width: auto;
+    background-color: black;
+    color: #fff;
+    padding: 5px;
+    border-radius: 6px;
+    
+    /* Position the tooltip text - see examples below! */
+    position: absolute;
+    z-index: 1;
+}
+    
+    /* Show the tooltip text when you mouse over the tooltip container */
+.bs-tooltip:hover .bs-tooltiptext {
+    visibility: visible;
+}
