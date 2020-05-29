@@ -4,11 +4,6 @@
             "id": "buysellenhancer@theonlylars.com"
         }
     },
-    "browser_specific_settings": {
-      "gecko": {
-        "id": "buysellenhancer@theonlylars.com"
-      }
-    },
     "manifest_version": 2,
     "name": "Pinkbike Buysell Enhancer",
     "version": "1.0",
