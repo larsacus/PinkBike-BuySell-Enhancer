@@ -8,6 +8,6 @@ Saves the following on your local browser as you view items in the marketplace:
 - Save notes for items
 
 ## Screenshots
-![img/demo-1.png](Demo 1)
+![Demo of price overlay and price tracking](img/demo-1.png)
 
-![img/demo-1.png](Demo 2)
+![Demo of price tracking without overlay](img/demo-2.png)
