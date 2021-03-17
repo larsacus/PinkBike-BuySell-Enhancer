@@ -1,5 +1,5 @@
 # PinkBike BuySell Enhancer for Firefox
-## ⚠️ This extension is likely in violation of Pinkbike's [Terms of Use](https://www.pinkbike.com/about/legal/) in section `C(v)` and `C(vi)` and you shouldn't use it.
+## ⚠️ This extension may be in violation of Pinkbike's [Terms of Use](https://www.pinkbike.com/about/legal/) in section `C(v)` and `C(vi)` and you shouldn't use it.
 A Firefox extension to add helpful features for buyers of Pinkbike's BuySell Marketplace
 
 Saves the following on your local browser as you view items in the marketplace:
